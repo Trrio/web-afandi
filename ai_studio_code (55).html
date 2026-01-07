@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Payroll Dosen & Staf - Lampung Timur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        input[type="number"], input[type="text"], select {
+            width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        th { background-color: #1e3a8a; color: white; padding: 6px; font-size: 10px; text-transform: uppercase; text-align: center;}
+        td { padding: 4px; border: 1px solid #e5e7eb; font-size: 11px; }
+        .bg-readonly { background-color: #f9fafb; font-weight: bold; }
+        .bg-total { background-color: #eff6ff; font-weight: bold; color: #1e40af; }
+        .grand-total-card { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+<div class="max-w-[1600px] mx-auto p-4">
+    <!-- HEADER & SUMMARY -->
+    <div class="bg-white p-5 rounded-lg shadow-md mb-6 border-l-8 border-blue-900 flex flex-wrap justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-blue-900">Sistem Penggajian Dosen & Staf</h1>
+            <p class="text-gray-500 text-sm italic">Data Payroll Otomatis Terintegrasi Bank</p>
+        </div>
+
+        <div class="grand-total-card p-4 rounded-xl shadow-lg text-white min-w-[340px]">
+            <p class="text-xs uppercase font-bold opacity-80 text-center">Total Seluruh Anggaran Gaji Bersih</p>
+            <h2 id="grandTotalDisplay" class="text-3xl font-black mt-1 text-center">Rp 0</h2>
+        </div>
+
+        <div class="bg-blue-50 p-3 rounded border border-blue-200 shadow-inner text-center">
+            <label class="block text-xs font-bold text-blue-800 mb-1 uppercase text-center">UMR Lampung Timur:</label>
+            <input type="number" id="umrGlobal" value="2893069" class="w-44 text-lg font-bold p-1 border-2 border-blue-400 rounded text-center" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="flex gap-2 mb-4">
+        <button onclick="switchSlide('slide-input')" id="btn-input" class="px-6 py-2 bg-blue-900 text-white rounded font-bold shadow-lg">SLIDE 1: INPUT DATA</button>
+        <button onclick="switchSlide('slide-output')" id="btn-output" class="px-6 py-2 bg-gray-400 text-white rounded font-bold shadow-lg">SLIDE 2: OUTPUT & REKENING</button>
+    </div>
+
+    <!-- SLIDE 1: INPUT -->
+    <div id="slide-input" class="tab-content active space-y-8">
+        <!-- Tabel Atas -->
+        <div class="bg-white p-4 rounded shadow-lg overflow-x-auto">
+            <h2 class="text-lg font-bold mb-3 text-blue-800 border-b-2 border-blue-900 pb-1 uppercase">1. Tabel Gaji Pokok & Honor Mengajar (Offline)</h2>
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th>No</th><th>Nama Dosen/Staf</th><th>Jabatan</th><th>Status</th><th>Koef</th><th>Honor Pokok</th>
+                        <th>% Tunj</th><th>Tunjangan</th><th>Total Pokok</th><th>Beban</th><th>TM</th>
+                        <th>Beban Ajar</th><th>Honor/TM</th><th>Transp</th><th>Total Offline</th>
+                    </tr>
+                </thead>
+                <tbody id="table-pokok-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Tabel Bawah -->
+        <div class="bg-white p-4 rounded shadow-lg overflow-x-auto border-t-4 border-orange-500">
+            <h2 class="text-lg font-bold mb-3 text-orange-700 border-b-2 border-orange-500 pb-1 uppercase">2. Honor Online (Khusus Staf Utama)</h2>
+            <table class="w-full border-collapse text-center">
+                <thead>
+                    <tr>
+                        <th>No</th><th>Nama Dosen</th><th>SKS (Manual)</th><th>Jml Sesi Zoom</th><th>Honor/Sesi</th><th>Pulsa/Sesi</th><th>Total Honor Zoom</th><th>Materi LMS</th><th>Total LMS</th><th class="bg-orange-600">Total Online</th>
+                    </tr>
+                </thead>
+                <tbody id="table-online-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: OUTPUT -->
+    <div id="slide-output" class="tab-content bg-white p-4 rounded shadow-lg overflow-x-auto">
+        <h2 class="text-xl font-bold mb-4 text-blue-900 border-b-2 border-blue-900 pb-2 uppercase">Rekapitulasi Gaji & Informasi Bank</h2>
+        <table class="w-full border-collapse text-left">
+            <thead>
+                <tr>
+                    <th>No</th><th>Nama Karyawan</th><th>Gaji Bersih</th><th>Bank</th><th>Rekening</th><th>Atas Nama</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="table-output-body"></tbody>
+        </table>
+        <div class="mt-8">
+            <button onclick="window.print()" class="bg-red-600 text-white px-8 py-3 rounded font-bold shadow uppercase hover:bg-red-700">Export ke PDF / Cetak</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 6 Nama Staf Khusus yang menyambung ke tabel online
+    const STAF_KHUSUS = ["Abdul Kadir, M.E", "Mohammad Ismail, M.E", "Ratih Ajeng Kusuma, M.H", "Habibatul Fauziah. M.E", "Intan Muthoharoh. M.H", "Arsyad Ali Fahmi, M.Pd.I"];
+
+    // Database Lengkap 24 Nama
+    let dataDosen = [
+        { nama: "Ahmad Abroza, M.Pd.I", jabatan: "Ketua Perguruan Tinggi", koef: 1.1, status: "Dosen Tetap", bank: "BSI", rek: "7297747163", an: "Ahmad Abroza" },
+        { nama: "Ibnu Mas’ud, M.Pd.I", jabatan: "Wakil Ketua I", koef: 0.8, status: "Dosen Tetap", bank: "BRI", rek: "570701018759533", an: "Ibnu Mas’ud" },
+        { nama: "Zainul Mubtadiin, M.Pd", jabatan: "Wakil Ketua II", koef: 0.2, status: "Dosen Tetap", bank: "BRI", rek: "570701006759539", an: "Zainul Mubtadin" },
+        { nama: "Andika Saputra,M.Pd.I", jabatan: "Wakil Ketua III", koef: 0.4, status: "Dosen Tetap", bank: "BSI", rek: "1047137973", an: "Andika Saputra" },
+        { nama: "Intan Muthoharoh. M.H", jabatan: "Ka Prodi HES", koef: 0.7, status: "Dosen Tetap", bank: "SEABANK", rek: "901850263975", an: "Intan Muthohoaroh" },
+        { nama: "Abdul Kadir, M.E", jabatan: "Ka Prodi ES", koef: 0.7, status: "Dosen Tetap", bank: "BSI", rek: "1047137973", an: "Abdul Kadir" },
+        { nama: "Dr.H. Mahmud Yunus, M.Pd.I", jabatan: "Penasehat", koef: 0.6, status: "Dosen Tetap", bank: "BRI", rek: "570701021150532", an: "Ahmad Abroza" },
+        { nama: "Ratih Ajeng Kusuma, M.H", jabatan: "Sekretaris Prodi HES", koef: 0.2, status: "Dosen Tetap", bank: "BSI", rek: "7320232923", an: "Ratih Ajeng Kusuma" },
+        { nama: "Habibatul Fauziah. M.E", jabatan: "Sekretaris Prodi ES", koef: 0.6, status: "Dosen Tetap", bank: "BRI", rek: "13001019549531", an: "Habibatul Fauziah" },
+        { nama: "Arsyad Ali Fahmi, M.Pd.I", jabatan: "Dosen Tetap II - LPM", koef: 0.4, status: "Dosen Tetap", bank: "BSI", rek: "7297729114", an: "Arsyad Ali Fahmi" },
+        { nama: "Mohammad Ismail, M.E", jabatan: "Dosen Tetap III - Sekr LPM", koef: 0.5, status: "Dosen Tetap", bank: "BRI", rek: "570701039514534", an: "Mohammad Ismail" },
+        { nama: "Afton Zuhri Adnan. M.Ag", jabatan: "LMS dan Website", koef: 0.2, status: "Operator LMS", bank: "BRI", rek: "581001030334532", an: "Afton Zuhri Adnan" },
+        { nama: "Saniatul Hidayah,M.Ag", jabatan: "Ketua Pengolola Jurnal", koef: 0.4, status: "Dosen Tetap", bank: "BRI", rek: "706101015837538", an: "Saniatul Hidayah" },
+        { nama: "Nurul Amalia Dewi. M.E", jabatan: "Staff", koef: 0.5, status: "Dosen Tetap", bank: "SEABANK", rek: "901351881699", an: "Nurul Amalia Dewi" },
+        { nama: "Nikmatur Rodiyah, M.Pd", jabatan: "Staff", koef: 0.3, status: "Dosen Tetap", bank: "SEABANK", rek: "900103386531", an: "Nikmatur Rodiyah" },
+        { nama: "Ali Sodiqin, M.Sy", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BRI", rek: "1300139074508", an: "Ali Sodikin" },
+        { nama: "Ardi Megantoro", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BRI", rek: "-", an: "Ardi Megantoro" },
+        { nama: "Dr. Bayu Prafitiri, M.Pd", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "MANDIRI", rek: "1140027727695", an: "Bayu Prafitri" },
+        { nama: "M syeh ikhsan S., M.H", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BRI", rek: "570701038798533", an: "M Syeh Ihksan S." },
+        { nama: "Maslien, M.Pd", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BRI", rek: "13001003486533", an: "Maslien" },
+        { nama: "Maylisa Isnaini Hidayah, M.Pd", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "MANDIRI", rek: "1140025700454", an: "Maylisa Isnaini H." },
+        { nama: "M. Suyatno, M.Pd", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BRI", rek: "56981002114536", an: "Muhammad Suyatno" },
+        { nama: "Sekar Tika Sari, M.B.A", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "BCA", rek: "7772795869", an: "Sekar Tika Sari" },
+        { nama: "Supriyo, M.Pd", jabatan: "DOSEN DLB", koef: 0, status: "Dosen Luar Biasa", bank: "NK LAMPU", rek: "3990301023869", an: "Supriyo" }
+    ];
+
+    dataDosen = dataDosen.map(d => ({ ...d, tunjanganPersen: 0, bebanMengajar: 4, tm: 0, onlineSks: 0, onlineZoom: 0, onlineLms: 0 }));
+
+    function switchSlide(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('btn-input').className = id === 'slide-input' ? 'px-6 py-2 bg-blue-900 text-white rounded font-bold' : 'px-6 py-2 bg-gray-400 text-white rounded font-bold';
+        document.getElementById('btn-output').className = id === 'slide-output' ? 'px-6 py-2 bg-blue-900 text-white rounded font-bold' : 'px-6 py-2 bg-gray-400 text-white rounded font-bold';
+    }
+
+    function formatIDR(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n); }
+
+    function calculateAll() {
+        const umr = parseFloat(document.getElementById('umrGlobal').value) || 0;
+        const tbodyPokok = document.getElementById('table-pokok-body');
+        const tbodyOnline = document.getElementById('table-online-body');
+        const tbodyOutput = document.getElementById('table-output-body');
+        let grandTotalBudget = 0; let onlineCounter = 1;
+
+        tbodyPokok.innerHTML = ""; tbodyOnline.innerHTML = ""; tbodyOutput.innerHTML = "";
+
+        dataDosen.forEach((d, i) => {
+            // PERHITUNGAN OFFLINE (Tabel Atas)
+            let honorPokok = umr * d.koef;
+            let tunjanganR = (d.tunjanganPersen / 100) * honorPokok;
+            let totalPokok = honorPokok + tunjanganR;
+            let bebanAjar = Math.max(0, d.tm - d.bebanMengajar);
+            let transp = (d.status === "Dosen Luar Biasa" || d.status === "Operator LMS") ? 50000 : 0;
+            let totalOffline = (75000 * bebanAjar) + (transp * bebanAjar);
+
+            tbodyPokok.innerHTML += `<tr><td class="text-center">${i+1}</td><td class="font-bold uppercase">${d.nama}</td><td class="text-[9px]">${d.jabatan}</td><td><select onchange="dataDosen[${i}].status=this.value; calculateAll()"><option value="Dosen Tetap" ${d.status==='Dosen Tetap'?'selected':''}>Dosen Tetap</option><option value="Dosen Luar Biasa" ${d.status==='Dosen Luar Biasa'?'selected':''}>Dosen Luar Biasa</option><option value="Operator LMS" ${d.status==='Operator LMS'?'selected':''}>Operator LMS</option></select></td><td><input type="number" step="0.1" value="${d.koef}" oninput="dataDosen[${i}].koef=this.value; calculateAll()"></td><td class="bg-readonly">${formatIDR(honorPokok)}</td><td><input type="number" value="${d.tunjanganPersen}" oninput="dataDosen[${i}].tunjanganPersen=this.value; calculateAll()"></td><td class="bg-readonly">${formatIDR(tunjanganR)}</td><td class="bg-total">${formatIDR(totalPokok)}</td><td><input type="number" value="${d.bebanMengajar}" oninput="dataDosen[${i}].bebanMengajar=this.value; calculateAll()"></td><td><input type="number" value="${d.tm}" oninput="dataDosen[${i}].tm=this.value; calculateAll()"></td><td class="bg-readonly text-center">${bebanAjar}</td><td class="text-center italic">75rb</td><td class="text-center font-bold ${transp>0?'text-red-600':''}">${transp.toLocaleString()}</td><td class="bg-total text-right">${formatIDR(totalOffline)}</td></tr>`;
+
+            // PERHITUNGAN ONLINE (Tabel Bawah - Kolom SKS Manual)
+            let totalOnline = 0;
+            if (STAF_KHUSUS.includes(d.nama)) {
+                // Rumus: Jml Zoom * (50rb + 25rb)
+                let totalZoom = d.onlineZoom * (50000 + 25000);
+                let totalLMS = d.onlineLms * 25000;
+                totalOnline = totalZoom + totalLMS;
+
+                tbodyOnline.innerHTML += `<tr><td>${onlineCounter++}</td><td class="font-bold bg-orange-50 uppercase text-left">${d.nama}</td><td><input type="number" value="${d.onlineSks}" oninput="dataDosen[${i}].onlineSks=this.value; calculateAll()"></td><td><input type="number" value="${d.onlineZoom}" oninput="dataDosen[${i}].onlineZoom=this.value; calculateAll()"></td><td>50rb</td><td>25rb</td><td class="bg-total">${formatIDR(totalZoom)}</td><td><input type="number" value="${d.onlineLms}" oninput="dataDosen[${i}].onlineLms=this.value; calculateAll()"></td><td class="bg-readonly">${formatIDR(totalLMS)}</td><td class="bg-orange-600 text-white font-bold text-right">${formatIDR(totalOnline)}</td></tr>`;
+            }
+
+            // PERHITUNGAN AKHIR (Output)
+            let gajiBersih = totalPokok + totalOffline + totalOnline;
+            grandTotalBudget += gajiBersih;
+
+            tbodyOutput.innerHTML += `<tr class="hover:bg-gray-50"><td class="text-center">${i+1}</td><td class="font-bold uppercase">${d.nama}</td><td class="bg-green-100 font-bold text-green-900 text-right text-sm">${formatIDR(gajiBersih)}</td><td>${d.bank}</td><td class="font-mono text-[10px]">${d.rek}</td><td>${d.an}</td><td><span class="text-green-600 font-bold text-[10px]">VERIFIED</span></td></tr>`;
+        });
+        document.getElementById('grandTotalDisplay').innerText = formatIDR(grandTotalBudget);
+    }
+
+    calculateAll();
+</script>
+</body>
+</html>
